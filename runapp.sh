@@ -1,0 +1,2 @@
+#!/bin/bash
+python app.py --model_name_or_path llava-hf/llava-1.5-7b-hf --load_4bit --share
