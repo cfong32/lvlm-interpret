@@ -6,6 +6,7 @@ from PIL import Image
 import torch
 # from torchvision.transforms.functional import to_pil_image
 from transformers import LlavaForConditionalGeneration, AutoProcessor
+from transformers import AutoModelForImageTextToText, Qwen2_5_VLForConditionalGeneration, LlavaConfig
 from transformers import BitsAndBytesConfig
 
 func_to_enable_grad = '_sample'
@@ -37,7 +38,7 @@ def get_processor_model(args):
         quant_config = None
 
     model = LlavaForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, torch_dtype=torch.bfloat16, 
+        args.model_name_or_path, torch_dtype=torch.bfloat16,
         quantization_config=quant_config, low_cpu_mem_usage=True, device_map=args.device_map
     )
     model.vision_tower.config.output_attentions = True
@@ -46,14 +47,14 @@ def get_processor_model(args):
     # set hooks to get attention weights
     model.enc_attn_weights = []
     #outputs: attn_output, attn_weights, past_key_value
-    def forward_hook(module, inputs, output): 
+    def forward_hook(module, inputs, output):
         if output[1] is None:
             logger.error(
                 ("Attention weights were not returned for the encoder. "
                 "To enable, set output_attentions=True in the forward pass of the model. ")
             )
             return output
-        
+
         output[1].requires_grad_(True)
         output[1].retain_grad()
         model.enc_attn_weights.append(output[1])
@@ -67,11 +68,11 @@ def get_processor_model(args):
     model.enc_attn_weights_vit = []
 
 
-    def forward_hook_image_processor(module, inputs, output): 
+    def forward_hook_image_processor(module, inputs, output):
         if output[1] is None:
             logger.warning(
                 ("Attention weights were not returned for the vision model. "
-                 "Relevancy maps will not be calculated for the vision model. " 
+                 "Relevancy maps will not be calculated for the vision model. "
                  "To enable, set output_attentions=True in the forward pass of vision_tower. ")
             )
             return output
@@ -85,7 +86,7 @@ def get_processor_model(args):
     for layer in model.vision_tower.vision_model.encoder.layers:
         hook_encoder_layer_vit = layer.self_attn.register_forward_hook(forward_hook_image_processor)
         hooks_pre_encoder_vit.append(hook_encoder_layer_vit)
-    
+
     return processor, model
 
 def process_image(image, image_process_mode, return_pil=False, image_format='PNG', max_len=1344, min_len=672):
