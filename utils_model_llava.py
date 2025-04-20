@@ -6,7 +6,7 @@ from PIL import Image
 import torch
 # from torchvision.transforms.functional import to_pil_image
 from transformers import LlavaForConditionalGeneration, AutoProcessor
-from transformers import AutoModelForImageTextToText, Qwen2_5_VLForConditionalGeneration, LlavaConfig
+from transformers import AutoModelForImageTextToText    #fcy
 from transformers import BitsAndBytesConfig
 
 func_to_enable_grad = '_sample'
@@ -37,11 +37,12 @@ def get_processor_model(args):
     else:
         quant_config = None
 
-    model = AutoModelForImageTextToText.from_pretrained(
+    model = AutoModelForImageTextToText.from_pretrained(    #fcy
         args.model_name_or_path, torch_dtype=torch.bfloat16,
         quantization_config=quant_config, low_cpu_mem_usage=True, device_map=args.device_map
     )
     model.vision_tower.config.output_attentions = True
+    # model.visual.config.output_attentions = True
 
     ### fcy
     if args.model_name_or_path == "Intel/llava-gemma-2b":
@@ -67,6 +68,7 @@ def get_processor_model(args):
 
     hooks_pre_encoder, hooks_encoder = [], []
     for layer in model.language_model.model.layers:
+    # for layer in model.model.model.layers:
         hook_encoder_layer = layer.self_attn.register_forward_hook(forward_hook)
         hooks_pre_encoder.append(hook_encoder_layer)
 
@@ -89,7 +91,9 @@ def get_processor_model(args):
 
     hooks_pre_encoder_vit = []
     for layer in model.vision_tower.vision_model.encoder.layers:
+    # for layer in model.visual.blocks:
         hook_encoder_layer_vit = layer.self_attn.register_forward_hook(forward_hook_image_processor)
+        # hook_encoder_layer_vit = layer.attn.register_forward_hook(forward_hook_image_processor)
         hooks_pre_encoder_vit.append(hook_encoder_layer_vit)
 
     return processor, model

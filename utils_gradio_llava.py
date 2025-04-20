@@ -11,7 +11,7 @@ import spaces
 
 from torchvision.transforms.functional import to_pil_image
 
-from utils_model import get_processor_model, move_to_device, to_gradio_chatbot, process_image
+from utils_model_llava import get_processor_model, move_to_device, to_gradio_chatbot, process_image
 
 from utils_attn import (
     handle_attentions_i2t, plot_attention_analysis, handle_relevancy, handle_text_relevancy, reset_tokens,
@@ -26,7 +26,7 @@ from utils_causal_discovery import (
 
 logger = logging.getLogger(__name__)
 
-N_LAYERS = 32 
+N_LAYERS = 32
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 ROLE0 = "USER"
 ROLE1 = "ASSISTANT"
@@ -70,11 +70,11 @@ def clear_history(request: gr.Request):
 
 def add_text(state, text, image, image_process_mode):
     global processor
-    
+
     if True: # state is None:
         state = gr.State()
         state.messages = []
-        
+
     if isinstance(image, dict):
         image = image['composite']
         background = Image.new('RGBA', image.size, (255, 255, 255))
@@ -100,7 +100,7 @@ def add_text(state, text, image, image_process_mode):
         prompt = system_prompt
         prompt_len += len(prompt)
         if image is not None:
-            msg = f"\n{ROLE0}: <image>\n{text}\n{ROLE1}:" # Ignore <image> token when calculating prompt length\     
+            msg = f"\n{ROLE0}: <image>\n{text}\n{ROLE1}:" # Ignore <image> token when calculating prompt length\
         else:
             msg = f"\n{ROLE0}: {text}\n{ROLE1}: "
         prompt += msg
@@ -117,12 +117,12 @@ def add_text(state, text, image, image_process_mode):
 
 
 @spaces.GPU
-def lvlm_bot(state, temperature, top_p, max_new_tokens):   
+def lvlm_bot(state, temperature, top_p, max_new_tokens):
     prompt = state.prompt
     prompt_len = state.prompt_len
     image = state.image
-    
-    inputs = processor(prompt, image, return_tensors="pt").to(model.device)
+
+    inputs = processor(image, prompt, return_tensors="pt").to(model.device)
     input_ids = inputs.input_ids
     img_idx = torch.where(input_ids==model.config.image_token_index)[1][0].item()
     do_sample = True if temperature > 0.001 else False
@@ -136,7 +136,7 @@ def lvlm_bot(state, temperature, top_p, max_new_tokens):
         eos_token_id = processor.tokenizer.eos_token_id
 
     outputs = model.generate(
-            **inputs, 
+            **inputs,
             do_sample=do_sample,
             temperature=temperature,
             top_p=top_p,
@@ -155,8 +155,8 @@ def lvlm_bot(state, temperature, top_p, max_new_tokens):
         input_text = '<s>' + input_text[4:] # Remove the first space after <s> to maintain correct length
     input_text_tokenized = processor.tokenizer.tokenize(input_text) # eg. ['<s>', '▁You', '▁are', '▁a', '▁helpful', ... ]
     input_text_tokenized[img_idx] = "average_image"
-    
-    output_ids = outputs.sequences.reshape(-1)[input_ids.shape[-1]:].tolist()  
+
+    output_ids = outputs.sequences.reshape(-1)[input_ids.shape[-1]:].tolist()
 
     generated_text = processor.tokenizer.decode(output_ids)
     output_ids_decoded = [processor.tokenizer.decode(oid).strip() for oid in output_ids] # eg. ['The', 'man', "'", 's', 'sh', 'irt', 'is', 'yellow', '.', '</s>']
@@ -182,11 +182,11 @@ def lvlm_bot(state, temperature, top_p, max_new_tokens):
     # Handle relevancy map
     # tokens_for_rel = tokens_for_rel[1:]
     word_rel_map = construct_relevancy_map(
-        tokenizer=processor.tokenizer, 
+        tokenizer=processor.tokenizer,
         model=model,
         input_ids=inputs.input_ids,
-        tokens=generated_text_tokenized, 
-        outputs=outputs, 
+        tokens=generated_text_tokenized,
+        outputs=outputs,
         output_ids=output_ids,
         img_idx=img_idx
     )
@@ -206,11 +206,11 @@ def lvlm_bot(state, temperature, top_p, max_new_tokens):
 
     state.recovered_image = img_recover
     state.input_text_tokenized = input_text_tokenized
-    state.output_ids_decoded = output_ids_decoded 
+    state.output_ids_decoded = output_ids_decoded
     state.attention_key = tempfilename.name
     state.image_idx = img_idx
 
-    return state, to_gradio_chatbot(state) 
+    return state, to_gradio_chatbot(state)
 
 
 def build_demo(args, embed_mode=False):
@@ -238,9 +238,9 @@ def build_demo(args, embed_mode=False):
         with gr.Tab("Generation"):
             with gr.Row():
                 with gr.Column(scale=6):
-                    
+
                     imagebox = gr.ImageEditor(type="pil", height=400, elem_id="image_canvas")
-                    
+
 
                     with gr.Accordion("Parameters", open=False) as parameter_row:
                         image_process_mode = gr.Radio(
@@ -265,7 +265,7 @@ def build_demo(args, embed_mode=False):
 
             # with gr.Row():
             #     with gr.Column(scale=6):
-                    
+
             #         gr.Examples(examples=[
             #             [f"{CUR_DIR}/examples/extreme_ironing.jpg", "What color is the man's shirt?"],
             #             [f"{CUR_DIR}/examples/waterview.jpg", "What is in the top left of this image?"],
@@ -321,26 +321,26 @@ def build_demo(args, embed_mode=False):
                     i2t_attn_head_mean_plot = gr.Plot(label="Image-to-Text attention average per head")
                     i2t_attn_gallery = gr.Gallery(type="pil", label='Attention heatmaps', columns=8, interactive=False)
 
-            box_states = gr.Dataframe(type="numpy", datatype="bool", row_count=24, col_count=24, visible=False) 
+            box_states = gr.Dataframe(type="numpy", datatype="bool", row_count=24, col_count=24, visible=False)
             with gr.Row(equal_height=True):
                 with gr.Column(scale=3):
                     imagebox_recover_boxable = gr.Image(label='Patch Selector')
                     attn_ana_head= gr.Slider(1, 40, step=1, label="Head Index")
-            
+
                     reset_boxes_btn = gr.Button(value="Reset patch selector")
                     attn_ana_submit_2 = gr.Button(value="Plot attention matrix", interactive=True)
-                
+
                 with gr.Column(scale=9):
                     t2i_attn_head_mean_plot = gr.Plot(label="Text-to-Image attention average per head")
                     attn_ana_plot_2 = gr.Plot(scale=2, label="Attention plot",container=True)
 
         reset_boxes_btn.click(
-            handle_box_reset, 
-            [imagebox_recover,box_states], 
+            handle_box_reset,
+            [imagebox_recover,box_states],
             [imagebox_recover_boxable, box_states]
         )
         imagebox_recover_boxable.select(boxes_click_handler, [imagebox_recover,box_states], [imagebox_recover_boxable, box_states])
-        
+
         attn_reset.click(
             reset_tokens,
             [state],
@@ -352,7 +352,7 @@ def build_demo(args, embed_mode=False):
             [state, attn_select_layer, box_states, attn_ana_head ],
             [state, attn_ana_plot_2, t2i_attn_head_mean_plot]
         )
-        
+
 
         attn_submit.click(
             handle_attentions_i2t,
@@ -374,7 +374,7 @@ def build_demo(args, embed_mode=False):
                 relevancy_gallery = gr.Gallery(type="pil", label='Input image relevancy heatmaps', columns=8, interactive=False)
             with gr.Row():
                 relevancy_txt_gallery = gr.Gallery(type="pil", label='Image-text relevancy comparison', columns=8, interactive=False)
-                #gr.Plot(label='Input text Relevancy heatmaps') 
+                #gr.Plot(label='Input text Relevancy heatmaps')
             with gr.Row():
                 relevancy_highlightedtext = gr.HighlightedText(
                         label='Tokens with high relevancy to image'
@@ -413,7 +413,7 @@ def build_demo(args, embed_mode=False):
                 with gr.Accordion("Hyper Parameters", open=False) as causal_parameters_row:
                         with gr.Row():
                             with gr.Column(scale=2):
-                                # search_rad_slider= gr.Slider(1, 5, step=1, value=3, label="Search Radius", 
+                                # search_rad_slider= gr.Slider(1, 5, step=1, value=3, label="Search Radius",
                                 #                              info="The maximal distance on the graph from the explained token.",)
                                 att_th_slider = gr.Slider(minimum=0.0001, maximum=1-0.0001, value=0.005, step=0.0001, interactive=True, label="Raw Attention Threshold",
                                                           info="A threshold for selecting tokens to be graph nodes.",)
@@ -430,13 +430,13 @@ def build_demo(args, embed_mode=False):
                 causal_head_submit = gr.Button(value="Plot Causal Head", interactive=True, scale=1)
             with gr.Row(visible=enable_causality):
                 causality_gallery = gr.Gallery(type="pil", label='Causal Heatmaps', columns=8, interactive=False)
-    
+
         causal_head_submit.click(
             handle_causal_head,
             [state, state_causal_explainers, causal_head_slider, causality_dropdown],
             [causal_head_gallery, pds_plot]
         )
-        
+
         causality_submit.click(
             handle_causality,
             [state, state_causal_explainers, causality_dropdown, alpha_slider, att_th_slider],
@@ -472,8 +472,8 @@ def build_demo(args, embed_mode=False):
             [state, causality_dropdown]
         )
         # .then(
-        #     handle_box_reset, 
-        #     [imagebox_recover,box_states], 
+        #     handle_box_reset,
+        #     [imagebox_recover,box_states],
         #     [imagebox_recover_boxable, box_states]
         # ).then(
         #     handle_attentions_i2t,
@@ -515,8 +515,8 @@ def build_demo(args, embed_mode=False):
         #     [state],
         #     [causality_dropdown]
         # ).then(
-        #     handle_box_reset, 
-        #     [imagebox_recover,box_states], 
+        #     handle_box_reset,
+        #     [imagebox_recover,box_states],
         #     [imagebox_recover_boxable, box_states]
         # ).then(
         #      plot_attention_analysis,
@@ -531,7 +531,7 @@ def build_demo(args, embed_mode=False):
         #     [state, relevancy_token_dropdown],
         #     [relevancy_txt_gallery, relevancy_highlightedtext]
         # )
-        
+
 
     return demo
 
