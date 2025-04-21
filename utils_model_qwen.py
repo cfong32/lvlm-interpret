@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 def get_processor_model(args):
     #outputs: attn_output, attn_weights, past_key_value
-    processor = AutoProcessor.from_pretrained(args.model_name_or_path)
+    processor = AutoProcessor.from_pretrained(
+        args.model_name_or_path,
+        min_pixels=args.min_pixels,
+        max_pixels=args.max_pixels,
+    )
 
     if args.load_4bit:
         quant_config = BitsAndBytesConfig(
@@ -45,8 +49,8 @@ def get_processor_model(args):
     model.visual.config.output_attentions = True
 
     ### fcy
-    if args.model_name_or_path == "Intel/llava-gemma-2b":
-        processor.patch_size = 14
+    # if args.model_name_or_path == "Intel/llava-gemma-2b":
+    #     processor.patch_size = 14
     ### fcy
 
     # Relevancy map
@@ -68,7 +72,7 @@ def get_processor_model(args):
 
     hooks_pre_encoder, hooks_encoder = [], []
     # for layer in model.language_model.model.layers:
-    for layer in model.model.model.layers:
+    for layer in model.model.layers:
         hook_encoder_layer = layer.self_attn.register_forward_hook(forward_hook)
         hooks_pre_encoder.append(hook_encoder_layer)
 
