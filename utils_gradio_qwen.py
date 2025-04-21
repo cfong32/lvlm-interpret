@@ -124,16 +124,24 @@ def lvlm_bot(state, temperature, top_p, max_new_tokens):
 
     inputs = processor(image, prompt, return_tensors="pt").to(model.device)
     input_ids = inputs.input_ids
-    img_idx = torch.where(input_ids==model.config.image_token_index)[1][0].item()
+
+    ### fcy
+    # img_idx = torch.where(input_ids==model.config.image_token_index)[1][0].item()
+    img_idx = []
+    ### fcy
+
     do_sample = True if temperature > 0.001 else False
     # Generate
     model.enc_attn_weights = []
     model.enc_attn_weights_vit = []
 
-    if model.language_model.config.model_type == "gemma":
-        eos_token_id = processor.tokenizer('<end_of_turn>', add_special_tokens=False).input_ids[0]
-    else:
-        eos_token_id = processor.tokenizer.eos_token_id
+    ### fcy
+    # if model.language_model.config.model_type == "gemma":
+    #     eos_token_id = processor.tokenizer('<end_of_turn>', add_special_tokens=False).input_ids[0]
+    # else:
+    #     eos_token_id = processor.tokenizer.eos_token_id
+    eos_token_id = processor.tokenizer.eos_token_id
+    ### fcy
 
     outputs = model.generate(
             **inputs,
